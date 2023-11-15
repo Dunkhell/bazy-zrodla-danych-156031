@@ -121,3 +121,110 @@ BEGIN
     DBMS_OUTPUT.PUT_LINE('Liczba pracowników: ' || v_employee_count);
     DBMS_OUTPUT.PUT_LINE('Liczba departamentów: ' || v_department_count);
 END;
+
+
+-- zad 2.1
+CREATE TABLE archiwum_departamentow
+(
+    id              NUMBER,
+    nazwa           VARCHAR(50),
+    data_zamkniecia DATE,
+    ostatni_manager NUMBER
+);
+
+CREATE OR REPLACE TRIGGER archive_department
+    AFTER DELETE
+    ON DEPARTMENTS
+    FOR EACH ROW
+BEGIN
+    INSERT INTO archiwum_departamentow
+    VALUES (:OLD.DEPARTMENT_ID, :OLD.DEPARTMENT_NAME, CURRENT_DATE, :OLD.MANAGER_ID);
+end;
+
+INSERT INTO DEPARTMENTS
+VALUES (1234, 'Test_usuwania', 100, 1000);
+SELECT *
+FROM DEPARTMENTS
+WHERE department_id = 1234;
+SELECT *
+FROM archiwum_departamentow;
+DELETE
+FROM DEPARTMENTS
+WHERE department_id = 1234;
+SELECT *
+FROM archiwum_departamentow;
+
+
+-- zad 2.2
+CREATE TABLE ZLODZIEJE
+(
+    user_id NUMBER,
+    data    DATE
+);
+
+CREATE OR REPLACE TRIGGER sprawdzanie_zarobkow
+    BEFORE INSERT OR UPDATE OF salary
+    ON EMPLOYEES
+    FOR EACH ROW
+BEGIN
+    IF :NEW.salary < 2000 OR :NEW.salary > 26000 THEN
+        INSERT INTO ZLODZIEJE (user_id, data)
+        VALUES (:OLD.EMPLOYEE_ID, SYSDATE);
+
+        RAISE_APPLICATION_ERROR(-20202, 'Zarobki muszą być w przedziale 2000 - 26000');
+    END IF;
+END;
+
+UPDATE EMPLOYEES
+SET SALARY = 200000
+WHERE EMPLOYEE_ID = 103;
+SELECT *
+FROM ZLODZIEJE;
+
+
+-- zad 2.3
+CREATE SEQUENCE employee_seq
+    START WITH 1
+    INCREMENT BY 1
+    NOMAXVALUE;
+
+CREATE OR REPLACE TRIGGER auto_increment_trigger
+    BEFORE INSERT
+    ON employees
+    FOR EACH ROW
+BEGIN
+    SELECT employee_seq.NEXTVAL
+    INTO :new.employee_id
+    FROM dual;
+end;
+
+INSERT INTO EMPLOYEES (FIRST_NAME, LAST_NAME, EMAIL, JOB_ID, HIRE_DATE)
+VALUES ('test', 'adamczyk', 'email@person.com', 'AD_PRES', CURRENT_DATE);
+SELECT *
+FROM EMPLOYEES
+where FIRST_NAME = 'test';
+
+-- zad 2.4
+CREATE OR REPLACE TRIGGER blokada_JOD_GRADES_DELETE
+    BEFORE DELETE
+    ON JOB_GRADES
+BEGIN
+    RAISE_APPLICATION_ERROR(-20202, 'Operacje DELETE na tabeli JOD_GRADES są zabronione');
+end;
+
+DELETE
+FROM JOB_GRADES
+WHERE GRADE = 'A';
+
+-- zad 2.5
+CREATE OR REPLACE TRIGGER zachowaj_stare_wartosci_salary_jobs
+    BEFORE UPDATE
+    ON jobs
+    FOR EACH ROW
+BEGIN
+    :NEW.min_salary := :OLD.min_salary;
+    :NEW.max_salary := :OLD.max_salary;
+end;
+
+UPDATE JOBS SET MAX_SALARY = 20000 WHERE JOB_ID = 'AC_ACCOUNT';
+SELECT * FROM JOBS WHERE JOB_ID = 'AC_ACCOUNT';
